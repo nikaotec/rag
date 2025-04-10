@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
+import java.util.stream.Collectors;
+import java.util.List;
 import java.net.URL;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.nikao.rag.service.ChatBot;
+import com.nikao.rag.service.EmbeddingService;
 import com.nikao.rag.service.FileProcessingService;
 import com.nikao.rag.service.ImageGenerator;
 
@@ -39,10 +42,15 @@ public class LLmController {
     @Autowired
     private final FileProcessingService fileProcessingService;
 
-    public LLmController(ImageGenerator imageGenerator, ChatBot chatBot, FileProcessingService fileProcessingService) {
+    @Autowired
+    private final EmbeddingService embeddingService;
+
+    public LLmController(ImageGenerator imageGenerator, ChatBot chatBot, FileProcessingService fileProcessingService,
+            EmbeddingService embeddingService) {
         this.imageGenerator = imageGenerator;
         this.chatBot = chatBot;
         this.fileProcessingService = fileProcessingService;
+        this.embeddingService = embeddingService;
     }
 
     @GetMapping("/home")
@@ -163,38 +171,49 @@ public class LLmController {
     }
 
     @PostMapping("/rag/multi-cloud")
-    public Mono<String> generateFromCloudAndUrl(
-            @RequestParam("prompt") String prompt,
-            @RequestParam(value = "url", required = false) String url,
-            @RequestParam(value = "cloudFileUrl", required = false) String cloudFileUrl) {
+    public Mono<String> generateWithEmbeddings(@RequestParam("prompt") String prompt,
+            @RequestParam(value = "cloudFileUrl", required = false) String cloudFileUrl,
+            @RequestParam(value = "url", required = false) String url) {
+        StringBuilder fullContext = new StringBuilder();
 
-        StringBuilder context = new StringBuilder();
-
+        // 🧪 Teste com PDF fixo (remova isso em produção)
         cloudFileUrl = "https://raw.githubusercontent.com/nikaotec/teste_chat/main/adventista.pdf";
 
         try {
-            // Busca o conteúdo do arquivo via URL (GitHub, Dropbox, etc)
+            // 🗂️ 1. Carregar conteúdo do arquivo e/ou URL
             if (cloudFileUrl != null && !cloudFileUrl.isBlank()) {
                 InputStream inputStream = new URL(cloudFileUrl).openStream();
                 String fileText = fileProcessingService.extractText(inputStream, cloudFileUrl);
-                context.append(fileText).append("\n\n");
+                fullContext.append(fileText).append("\n\n");
             }
 
-            // Também adiciona conteúdo de uma URL (scraping)
             if (url != null && !url.isBlank()) {
-                String webText = fileProcessingService.crawlWebsite(url, 5);
-                context.append(webText).append("\n\n");
+                String urlText = fileProcessingService.crawlWebsite(url, 5);
+                fullContext.append(urlText).append("\n\n");
             }
 
-            if (context.isEmpty()) {
-                return Mono.just("Nenhuma fonte válida foi fornecida.");
+            if (fullContext.isEmpty()) {
+                return Mono.just("Nenhuma fonte de informação fornecida (arquivo ou URL).");
             }
 
-            String safeContext = context.length() > 3000 ? context.substring(0, 3000) : context.toString();
-            return chatBot.generateWithContext(safeContext, prompt);
+            // 🧩 2. Dividir em pedaços para embedding
+            String allText = fullContext.toString();
+            List<String> chunks = fileProcessingService.splitIntoChunks(allText, 500);
+
+            // 🧠 3. Gerar embeddings e ranquear com base no prompt
+            return embeddingService.rankChunks(chunks, prompt)
+                    .flatMap(relevantChunks -> {
+                        // 📚 4. Montar contexto a partir dos chunks ranqueados
+                        String context = relevantChunks.stream()
+                                .map(EmbeddingService.ScoredChunk::text)
+                                .collect(Collectors.joining("\n\n"));
+
+                        // 🤖 5. Passar contexto + prompt para o modelo
+                        return chatBot.generateWithContext(context, prompt);
+                    });
 
         } catch (Exception e) {
-            return Mono.just("Erro ao processar: " + e.getMessage());
+            return Mono.just("Erro ao processar conteúdo: " + e.getMessage());
         }
     }
 

@@ -26,6 +26,10 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+// Add this method to the FileProcessingService class
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 public class FileProcessingService {
 
@@ -61,6 +65,16 @@ public class FileProcessingService {
             throw new IllegalArgumentException("Formato de arquivo não suportado: " + fileName);
         }
     }
+
+
+public List<String> splitIntoChunks(String text, int chunkSize) {
+    List<String> chunks = new ArrayList<>();
+    for (int start = 0; start < text.length(); start += chunkSize) {
+        int end = Math.min(start + chunkSize, text.length());
+        chunks.add(text.substring(start, end));
+    }
+    return chunks;
+}
 
     private String extractFromPdf(InputStream inputStream) throws IOException {
         try (PDDocument document = PDDocument.load(inputStream)) {
