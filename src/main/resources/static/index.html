@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-Br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assistente Inteligente</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f9f9f9; color: #333; display: flex; flex-direction: column; height: 100vh; }
+    header { background: #2c3e50; color: white; padding: 1rem; text-align: center; font-size: 1.5rem; }
+    .chat-container { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+    .message { max-width: 80%; padding: 0.8rem 1rem; border-radius: 1rem; font-size: 1rem; line-height: 1.4; }
+    .user { align-self: flex-end; background: #3498db; color: white; border-bottom-right-radius: 0; }
+    .bot { align-self: flex-start; background: #ecf0f1; color: #2c3e50; border-bottom-left-radius: 0; }
+    form { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem; border-top: 1px solid #ddd; background: white; }
+    input[type="text"] { padding: 0.75rem 1rem; border: 1px solid #ccc; border-radius: 0.5rem; font-size: 1rem; width: 100%; }
+    button { padding: 0.75rem 1.5rem; background: #2c3e50; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; cursor: pointer; align-self: flex-end; }
+    button:hover { background: #34495e; }
+  </style>
+</head>
+<body>
+  <header>Assistente Inteligente</header>
+  <div class="chat-container" id="chat"></div>
+  <form id="chatForm">
+    <input type="text" id="userInput" name="prompt" placeholder="Digite sua pergunta..." required>
+    <button type="submit">Enviar</button>
+  </form>
+
+  <script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('chatForm');
+    const input = document.getElementById('userInput');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const prompt = input.value.trim();
+      if (!prompt) return;
+      addMessage(prompt, 'user');
+      input.value = '';
+
+      const formData = new URLSearchParams();
+      formData.append('prompt', prompt);
+
+      const response = await fetch('/llm/rag/multi-cloud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData
+      });
+
+      const resposta = await response.text();
+      addMessage(resposta, 'bot');
+    });
+
+    function addMessage(text, sender) {
+      const msg = document.createElement('div');
+      msg.className = `message ${sender}`;
+      msg.textContent = text;
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>
