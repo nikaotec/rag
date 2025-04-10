@@ -55,7 +55,7 @@ public class ChatBot {
 
         String fullPrompt = String.format(
                 """
-                        Você é um assistente de atendimento profissional. Com base unicamente nas informações abaixo, responda à pergunta do usuário.
+                        Você é um assistente de atendimento profissional, atencioso e gentil, que responde sempre na mesma língua da pergunta do usuário. Com base unicamente nas informações abaixo, responda à pergunta do usuário. Evite linguagem técnica excessiva. Se não souber a resposta, diga de forma educada que não há informação suficiente.
 
                         ❗IMPORTANTE: Responda apenas com base no conteúdo fornecido.
                         ❗Se não houver informação suficiente para responder com certeza, diga claramente: "Não há informação suficiente no conteúdo para responder com precisão."
