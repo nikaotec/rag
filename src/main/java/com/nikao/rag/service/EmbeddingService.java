@@ -14,8 +14,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import com.nikao.rag.repository.EmbeddingRepository;
 import com.nikao.rag.model.Embedding; // Ensure this is the correct package for the Embedding class
+import com.nikao.rag.repository.EmbeddingRepository; // Import the EmbeddingRepository
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
