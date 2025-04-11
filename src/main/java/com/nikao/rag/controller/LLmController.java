@@ -198,7 +198,7 @@ public class LLmController {
 
             // 🧩 2. Dividir em pedaços para embedding
             String allText = fullContext.toString();
-            List<String> chunks = fileProcessingService.splitIntoChunks(allText, 500);
+            List<String> chunks = fileProcessingService.splitBySections(allText);
 
             // 🧠 3. Gerar embeddings e ranquear com base no prompt
             return embeddingService.rankChunks(chunks, prompt)

@@ -3,6 +3,9 @@ package com.nikao.rag.service;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
+import java.util.List;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,14 +23,24 @@ public class ChatBot {
 
     private final WebClient webClient;
     private static final Logger logger = LoggerFactory.getLogger(ChatBot.class);
+    private final String model;
 
-    public ChatBot(@Value("${huggingface.text.api.url}") String apiUrl,
-            @Value("${huggingface.api.key}") String apiKey) {
+    public ChatBot(@Value("${mistral.api.key}") String apiKey,
+            @Value("${mistral.api.url}") String apiUrl,
+            @Value("${mistral.model}") String model) {
         this.webClient = WebClient.builder()
-                .baseUrl(apiUrl) // Set the base URL for the API
-                .defaultHeader("Authorization", "Bearer " + apiKey) // Add API key to the header
+                .baseUrl(apiUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .build();
+        this.model = model;
     }
+    // public ChatBot(@Value("${huggingface.text.api.url}") String apiUrl,
+    //         @Value("${huggingface.api.key}") String apiKey) {
+    //     this.webClient = WebClient.builder()
+    //             .baseUrl(apiUrl) // Set the base URL for the API
+    //             .defaultHeader("Authorization", "Bearer " + apiKey) // Add API key to the header
+    //             .build();
+    // }
 
     // Method to generate text using Hugging Face's Inference API
     public Mono<String> generateText(String prompt) {
@@ -49,40 +62,51 @@ public class ChatBot {
                 .onErrorResume(e -> Mono.just("Erro: " + e.getMessage()));
     }
 
-    public Mono<String> generateWithContext(String context, String prompt) {
-        // Trunca o contexto para evitar excesso de tokens
-        context = context.length() > 3000 ? context.substring(0, 3000) : context;
+    public Mono<String> generateWithContext(String context, String question) {
+        // System prompt — define comportamento do assistente
+        String systemPrompt = """
+                Você é um assistente educado e objetivo.
 
-        String fullPrompt = String.format(
-                """
-                        Você é um assistente de atendimento profissional, atencioso e gentil, que responde sempre na mesma língua da pergunta do usuário. Com base unicamente nas informações abaixo, responda à pergunta do usuário. Evite linguagem técnica excessiva. Se não souber a resposta, diga de forma educada que não há informação suficiente.
+                ✅ Responda APENAS com base no conteúdo fornecido.
+                ✅ Responda na MESMA LÍNGUA usada na pergunta.
+                ❌ Nunca use conhecimento externo.
+                ❌ Nunca traduza a pergunta nem a resposta para outro idioma.
+                ❌ Nunca misture idiomas (por exemplo, partes em inglês e português).
 
-                        ❗IMPORTANTE: Responda apenas com base no conteúdo fornecido.
-                        ❗Se não houver informação suficiente para responder com certeza, diga claramente: "Não há informação suficiente no conteúdo para responder com precisão."
+                Se não houver informação suficiente, diga exatamente (na língua da pergunta):
+                - Português: "Não há informação suficiente no conteúdo para responder com precisão."
+                - Inglês: "There is not enough information in the content to answer accurately."
+                """;
 
-                        [CONTEÚDO]
-                        %s
+        // Prompt do usuário contendo o contexto e a pergunta
+        String userPrompt = String.format("""
+                Conteúdo:
+                %s
 
-                        [PERGUNTA]
-                        %s
+                Pergunta:
+                %s
 
-                        [RESPOSTA]
-                        """,
-                context, prompt);
+                Resposta:
+                """, context, question);
 
-        Map<String, String> body = Collections.singletonMap("inputs", fullPrompt);
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "temperature", 0.2,
+                "top_p", 0.9,
+                "max_tokens", 512,
+                "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", userPrompt)));
 
         return webClient.post()
-                .bodyValue(body)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody)
                 .retrieve()
-                .bodyToFlux(HuggingFaceResponse.class)
-                .next()
-                .map(HuggingFaceResponse::generated_text)
-                .map(ChatBot::limparResposta)
-                .doOnNext(resposta -> logger.info("Resposta final (limpa): {}", resposta))
-                .onErrorResume(e -> {
-                    logger.error("Erro durante chamada à Hugging Face", e);
-                    return Mono.just("Erro: " + e.getMessage());
+                .bodyToMono(Map.class)
+                .map(response -> {
+                    var choices = (List<Map<String, Object>>) response.get("choices");
+                    var message = (Map<String, Object>) choices.get(0).get("message");
+                    return (String) message.get("content");
                 });
     }
 

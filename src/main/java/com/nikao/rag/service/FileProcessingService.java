@@ -53,12 +53,12 @@ public class FileProcessingService {
         } else if (fileName.endsWith(".docx")) {
             XWPFDocument doc = new XWPFDocument(stream);
             return doc.getParagraphs().stream().map(XWPFParagraph::getText).collect(Collectors.joining("\n"));
-        // } else if (fileName.endsWith(".xml")) {
-        //     try {
-        //         return extractFromXml(stream);
-        //     } catch (Exception e) {
-        //         throw new IOException("Erro ao processar XML", e);
-        //     }
+            // } else if (fileName.endsWith(".xml")) {
+            // try {
+            // return extractFromXml(stream);
+            // } catch (Exception e) {
+            // throw new IOException("Erro ao processar XML", e);
+            // }
         } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
             return extractFromExcel(stream);
         } else {
@@ -66,20 +66,19 @@ public class FileProcessingService {
         }
     }
 
-
-public List<String> splitIntoChunks(String text, int chunkSize) {
-    List<String> chunks = new ArrayList<>();
-    for (int start = 0; start < text.length(); start += chunkSize) {
-        int end = Math.min(start + chunkSize, text.length());
-        chunks.add(text.substring(start, end));
+    public List<String> splitIntoChunks(String text, int chunkSize) {
+        List<String> chunks = new ArrayList<>();
+        for (int start = 0; start < text.length(); start += chunkSize) {
+            int end = Math.min(start + chunkSize, text.length());
+            chunks.add(text.substring(start, end));
+        }
+        return chunks;
     }
-    return chunks;
-}
 
     private String extractFromPdf(InputStream inputStream) throws IOException {
         try (PDDocument document = PDDocument.load(inputStream)) {
             PDFTextStripper stripper = new PDFTextStripper();
-            return stripper.getText(document);
+            return stripper.getText(document).replaceAll("\\s{2,}", " ").trim();
         }
     }
 
@@ -95,29 +94,28 @@ public List<String> splitIntoChunks(String text, int chunkSize) {
     }
 
     public String extractFromExcel(InputStream stream) throws IOException {
-    StringBuilder sb = new StringBuilder();
-    Workbook workbook = new XSSFWorkbook(stream);
+        StringBuilder sb = new StringBuilder();
+        Workbook workbook = new XSSFWorkbook(stream);
 
-    for (Sheet sheet : workbook) {
-        sb.append("Planilha: ").append(sheet.getSheetName()).append("\n");
-        for (Row row : sheet) {
-            for (Cell cell : row) {
-                switch (cell.getCellType()) {
-                    case STRING -> sb.append(cell.getStringCellValue()).append(" | ");
-                    case NUMERIC -> sb.append(cell.getNumericCellValue()).append(" | ");
-                    case BOOLEAN -> sb.append(cell.getBooleanCellValue()).append(" | ");
-                    default -> sb.append(" | ");
+        for (Sheet sheet : workbook) {
+            sb.append("Planilha: ").append(sheet.getSheetName()).append("\n");
+            for (Row row : sheet) {
+                for (Cell cell : row) {
+                    switch (cell.getCellType()) {
+                        case STRING -> sb.append(cell.getStringCellValue()).append(" | ");
+                        case NUMERIC -> sb.append(cell.getNumericCellValue()).append(" | ");
+                        case BOOLEAN -> sb.append(cell.getBooleanCellValue()).append(" | ");
+                        default -> sb.append(" | ");
+                    }
                 }
+                sb.append("\n");
             }
             sb.append("\n");
         }
-        sb.append("\n");
+
+        workbook.close();
+        return sb.toString();
     }
-
-    workbook.close();
-    return sb.toString();
-}
-
 
     public String crawlWebsite(String baseUrl, int maxPages) throws IOException {
         Set<String> visited = new HashSet<>();
@@ -150,6 +148,14 @@ public List<String> splitIntoChunks(String text, int chunkSize) {
         }
 
         return allContent.toString();
+    }
+
+    public List<String> splitBySections(String fullText) {
+        return List.of(fullText.split("(?=\\n?\\d+\\.\\s)"))
+                .stream()
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toList());
     }
 
 }
