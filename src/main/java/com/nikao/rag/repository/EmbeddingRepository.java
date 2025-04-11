@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface EmbeddingRepository extends JpaRepository<Embedding, Long> {
+public interface EmbeddingRepository extends JpaRepository<Embedding, Integer> {
     Optional<Embedding> findByHash(int hash);
 }
