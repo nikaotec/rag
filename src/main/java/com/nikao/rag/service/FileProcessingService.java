@@ -25,6 +25,8 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+import java.net.URL;
 
 // Add this method to the FileProcessingService class
 import java.util.ArrayList;
@@ -87,6 +89,12 @@ public class FileProcessingService {
                 XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
             return extractor.getText();
         }
+    }
+
+    public String loadDefaultText(String path) throws IOException {
+        String url = path;
+        InputStream inputStream = new URL(url).openStream();
+        return extractText(inputStream, url);
     }
 
     public String extractTextFromUrl(String url) throws IOException {
@@ -157,5 +165,58 @@ public class FileProcessingService {
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.toList());
     }
+
+    public List<String> splitSmartChunks(String texto, List<String> palavrasChave) {
+        List<String> chunks = new ArrayList<>();
+        texto = texto.replaceAll("\\r", "").trim();
+
+        if (palavrasChave != null && !palavrasChave.isEmpty()) {
+            String regex = palavrasChave.stream()
+                    .map(Pattern::quote)
+                    .map(p -> "(?=\\b" + p + "\\b)")
+                    .collect(Collectors.joining("|"));
+
+            String[] partes = texto.split(regex);
+            for (String parte : partes) {
+                String chunk = parte.trim();
+                if (!chunk.isBlank() && chunk.length() > 25) {
+                    chunks.add(chunk);
+                }
+            }
+
+            if (!chunks.isEmpty())
+                return chunks;
+        }
+
+        if (texto.matches("(?s).*\\n\\d+\\.\\s+.*")) {
+            String[] secoes = texto.split("(?=\\n\\d+\\.\\s)");
+            for (String secao : secoes) {
+                String chunk = secao.trim();
+                if (!chunk.isBlank() && chunk.length() > 25) {
+                    chunks.add(chunk);
+                }
+            }
+
+            if (!chunks.isEmpty())
+                return chunks;
+        }
+
+        String[] paragrafos = texto.split("\\n\\n");
+        StringBuilder atual = new StringBuilder();
+        for (String par : paragrafos) {
+            if ((atual.length() + par.length()) > 700) {
+                chunks.add(atual.toString().trim());
+                atual.setLength(0);
+            }
+            atual.append(par).append("\n\n");
+        }
+        if (!atual.isEmpty()) {
+            chunks.add(atual.toString().trim());
+        }
+
+        return chunks;
+    }
+
+    
 
 }

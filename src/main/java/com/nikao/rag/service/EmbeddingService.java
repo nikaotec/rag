@@ -56,32 +56,34 @@ public class EmbeddingService {
         });
     }
 
-    private float cosineSimilarity(List<Float> a, List<Float> b) {
-        float dot = 0, normA = 0, normB = 0;
-        for (int i = 0; i < a.size(); i++) {
-            dot += a.get(i) * b.get(i);
-            normA += a.get(i) * a.get(i);
-            normB += b.get(i) * b.get(i);
+    public double cosineSimilarity(double[] a, double[] b) {
+        double dot = 0.0, normA = 0.0, normB = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
         }
-        return (float) (dot / (Math.sqrt(normA) * Math.sqrt(normB)));
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-    public Mono<List<ScoredChunk>> rankChunks(List<String> chunks, String prompt) {
-        return embed(prompt)
-                .flatMapMany(promptVector -> Flux.fromIterable(chunks)
-                        .flatMap(chunk -> embed(chunk).map(
-                                chunkVector -> new ScoredChunk(chunk, cosineSimilarity(promptVector, chunkVector)))))
-                .doOnNext(chunk -> {
-                    System.out.println("🧩 CHUNK SCORE: " + String.format("%.4f", chunk.score()));
-                    System.out.println(chunk.text().substring(0, Math.min(chunk.text().length(), 300)));
-                    System.out.println("-----");
-                })
-                .filter(chunk -> chunk.score() > 0.5f) // mais permissivo
-                .sort(Comparator.comparing(ScoredChunk::score).reversed())
-                .take(5)
-                .collectList();
-    }
+   // public Mono<List<ScoredChunk>> rankChunks(List<String> chunks, String prompt) {
+    //     return embed(prompt)
+    //             .flatMapMany(promptVector -> Flux.fromIterable(chunks)
+    //                     .flatMap(chunk -> embed(chunk).map(
+    //                             chunkVector -> new ScoredChunk(chunk, cosineSimilarity(
+    //                                     promptVector.stream().mapToDouble(Float::doubleValue).toArray(),
+    //                                     chunkVector.stream().mapToDouble(Float::doubleValue).toArray())))))
+    //             .doOnNext(chunk -> {
+    //                 System.out.println("🧩 CHUNK SCORE: " + String.format("%.4f", chunk.score()));
+    //                 System.out.println(chunk.text().substring(0, Math.min(chunk.text().length(), 300)));
+    //                 System.out.println("-----");
+    //             })
+    //             .filter(chunk -> chunk.score() > 0.5f) // mais permissivo
+    //             .sort(Comparator.comparing(ScoredChunk::score).reversed())
+    //             .take(5)
+    //             .collectList();
+    // }
 
-    public record ScoredChunk(String text, float score) {
-    }
+    // public record ScoredChunk(String text, float score) {
+    // }
 }
