@@ -1,6 +1,5 @@
 package com.nikao.rag.service;
 
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -16,7 +15,7 @@ import java.util.Map;
 public class ImageGenerator {
 
     private final WebClient webClient;
-    private static final Logger logger = LoggerFactory.getLogger(ImageGenerator.class);
+    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(ImageGenerator.class);
 
     public ImageGenerator(@Value("${huggingface.image.api.url}") String apiUrl,
                           @Value("${huggingface.api.key}") String apiKey) {

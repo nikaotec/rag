@@ -1,44 +1,60 @@
 package com.nikao.rag.model;
 
-import java.util.List;
-
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
+import java.util.List;
+import jakarta.persistence.ElementCollection;
 
 @Entity
-public class Embedding {
+public class CompanyEmbedding {
 
-     @Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long embeddingId;
 
-    @Lob // ⬅️ ESSENCIAL para textos grandes
+    @Column(name = "company_id")
+    private Long companyId;
+
+    @Lob
     @Column(name = "texto")
     private String texto;
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @Column(columnDefinition = "real[]")
     private List<Float> vector;
 
     private int hash;
 
-    public Embedding() {}
+    public CompanyEmbedding() {
+    }
 
-    public Embedding(String texto, List<Float> vector) {
+    public CompanyEmbedding(Long companyId, String texto, List<Float> vector) {
+        this.companyId = companyId;
         this.texto = texto;
         this.vector = vector;
         this.hash = texto.hashCode();
     }
 
+    public CompanyEmbedding(String texto, List<Float> vector) {
+        this.texto = texto;
+        this.vector = vector;
+        this.hash = texto.hashCode();
+    }
 
-    // ✅ Getters e Setters obrigatórios
-    public Long getId() {
-        return id;
+    public Long getEmbeddingId() {
+        return embeddingId;
+    }
+
+    public Long getCompanyId() {
+        return companyId;
+    }
+
+    public void setCompanyId(Long companyId) {
+        this.companyId = companyId;
     }
 
     public String getTexto() {

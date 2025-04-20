@@ -1,49 +1,42 @@
 package com.nikao.rag.service;
 
-import java.time.Duration;
-import java.util.Collections;
-import java.util.Map;
-import java.util.List;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import com.nikao.rag.records.HuggingFaceResponse;
+import org.springframework.stereotype.Service;
 
+import com.nikao.rag.model.Company;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import com.nikao.rag.records.HuggingFaceResponse;
-
+import org.springframework.web.server.ResponseStatusException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
 
 @Service
 public class ChatBot {
-
     private final WebClient webClient;
-    private static final Logger logger = LoggerFactory.getLogger(ChatBot.class);
     private final String model;
+    private final CompanyService companyService;
+    private final Logger logger = LoggerFactory.getLogger(ChatBot.class);
 
-    public ChatBot(@Value("${mistral.api.key}") String apiKey,
+    ChatBot(@Value("${mistral.api.key}") String apiKey,
             @Value("${mistral.api.url}") String apiUrl,
-            @Value("${mistral.model}") String model) {
-        this.webClient = WebClient.builder()
+            @Value("${mistral.model}") String model,
+            CompanyService companyService) {
+        this.webClient = WebClient.builder().defaultHeader("Accept", "application/json")
                 .baseUrl(apiUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .defaultHeader("Content-Type", "application/json")
+                .defaultHeader("Authorization", "Bearer " + apiKey).
                 .build();
         this.model = model;
+        this.companyService = companyService;
     }
-    // public ChatBot(@Value("${huggingface.text.api.url}") String apiUrl,
-    //         @Value("${huggingface.api.key}") String apiKey) {
-    //     this.webClient = WebClient.builder()
-    //             .baseUrl(apiUrl) // Set the base URL for the API
-    //             .defaultHeader("Authorization", "Bearer " + apiKey) // Add API key to the header
-    //             .build();
-    // }
 
-    // Method to generate text using Hugging Face's Inference API
-    public Mono<String> generateText(String prompt) {
+    Mono<String> generateText(String prompt) {
         // Validate the input prompt
         if (prompt == null || prompt.trim().isEmpty()) {
             return Mono.error(new IllegalArgumentException("Prompt must not be null or empty"));
@@ -61,16 +54,20 @@ public class ChatBot {
                 .map(HuggingFaceResponse::generated_text)
                 .onErrorResume(e -> Mono.just("Erro: " + e.getMessage()));
     }
-
-    public Mono<String> generateWithContext(String context, String question) {
+    
+    Mono<String> generateWithContext(String context, String question, Long companyId) {
         // System prompt — define comportamento do assistente
-        String systemPrompt = """
-               You are a polite and objective assistant. Your name is Graça.
+        Company company = companyService.findById(companyId).orElseThrow(() ->
+                new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Company not found"));
 
-                ✅ If and only if the question is clearly a greeting (such as 'hi', 'hello', 'how are you?', 'good morning'), respond with a friendly greeting and say that your name is Graça.
-                ✅ When referring to yourself, always use feminine pronouns (e.g., 'I am', 'my role is', 'my name is').
-                ✅ When describing yourself, always use feminine adjectives (e.g., 'intelligent', 'polite', 'objective').
-                ✅ Respond ONLY based on the content provided.
+        String systemPrompt = String.format("""
+               You are a polite and objective assistant. Your name is Graça. You are answering questions for %s company.
+               The address is: %s
+
+               ✅ If and only if the question is clearly a greeting (such as 'hi', 'hello', 'how are you?', 'good morning'), respond with a friendly greeting and say that your name is Graça.
+               ✅ When referring to yourself, always use feminine pronouns (e.g., 'I am', 'my role is', 'my name is').
+               ✅ When describing yourself, always use feminine adjectives (e.g., 'intelligent', 'polite', 'objective').
+               ✅ Respond ONLY based on the content provided.
                 ✅ If the content contains event times, such as worship services, meetings, or gatherings, extract the times and present them clearly to the user.
                 ✅ If the content contains more than one address, extract and present them clearly to the user.
                 ✅ If there is more than one time or event, show all of them and ask the user to choose which one they want more information about.
@@ -79,12 +76,12 @@ public class ChatBot {
                 ❌ Never use external knowledge.
                 ❌ Never translate the question or the answer into another language.
                 ❌ Never mix languages (e.g., parts in English and Portuguese).
+               
+               If there is not enough information, say exactly in the language the question was asked:
+               - Portuguese: "Não há informação suficiente no conteúdo para responder com precisão."
+               """, company.getCompanyName(), company.getAddress());
 
-                If there is not enough information, say exactly in the language the question was asked:
-                - Portuguese: "Não há informação suficiente no conteúdo para responder com precisão."
-                """;
-
-        // Prompt do usuário contendo o contexto e a pergunta
+                // Prompt do usuário contendo o contexto e a pergunta
         String userPrompt = String.format("""
                 Conteúdo:
                 %s
@@ -115,13 +112,5 @@ public class ChatBot {
                     return (String) message.get("content");
                 });
     }
-
-    public static String limparResposta(String respostaGerada) {
-        int index = respostaGerada.lastIndexOf("[RESPOSTA]");
-        if (index != -1) {
-            return respostaGerada.substring(index + "[RESPOSTA]".length()).strip();
-        }
-        return respostaGerada.strip();
-    }
-
+    
 }

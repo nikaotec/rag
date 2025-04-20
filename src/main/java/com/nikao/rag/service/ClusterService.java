@@ -1,6 +1,5 @@
 package com.nikao.rag.service;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import smile.clustering.KMeans;
@@ -22,18 +21,17 @@ public class ClusterService {
         this.embeddingService = embeddingService;
     }
 
-    @PostConstruct
-    public void inicializarClusters() {
+    public void inicializarClusters(Long companyId) {
         try {
             System.out.println("📥 Iniciando clusterização de chunks...");
             String texto = fileProcessingService.loadDefaultText(
                     "https://raw.githubusercontent.com/nikaotec/teste_chat/main/adventista.pdf");
             List<String> palavras = List.of("História", "Doutrinas", "Endereço", "Horários", "Missão", "ADRA",
                     "Educação");
-
+            
             List<String> chunks = fileProcessingService.splitSmartChunks(texto, palavras);
             List<ChunkData> embeddings = chunks.stream()
-                    .map(chunk -> new ChunkData(chunk, embeddingService.embed(chunk).block()))
+                    .map(chunk -> new ChunkData(chunk, embeddingService.embed(chunk, companyId).block(), companyId))
                     .filter(c -> c.embedding() != null && !c.embedding().isEmpty())
                     .toList();
 
@@ -45,10 +43,10 @@ public class ClusterService {
 
             for (int i = 0; i < vetores.length; i++) {
                 int cluster = kmeansModel.y[i];
-                clusterMap.computeIfAbsent(cluster, c -> new ArrayList<>()).add(embeddings.get(i));
-            }
+                clusterMap.computeIfAbsent(cluster, c -> new ArrayList<>()).add(embeddings.get(i)); 
+            } 
 
-            System.out.printf("✅ Clusters criados com sucesso (%d clusters, %d chunks).\n", kmeansModel.k,
+            System.out.printf("✅ Clusters criados com sucesso (companyId: %d, %d clusters, %d chunks).\n", companyId, kmeansModel.k,
                     embeddings.size());
 
         } catch (Exception e) {
@@ -57,8 +55,8 @@ public class ClusterService {
         }
     }
 
-    public Mono<List<String>> buscarChunksMaisRelevantes(String prompt) {
-        return embeddingService.embed(prompt).map(vetor -> {
+    public Mono<List<String>> buscarChunksMaisRelevantes(String prompt, Long companyId) {
+        return embeddingService.embed(prompt, companyId).map(vetor -> {
             double[] entrada = vetor.stream().mapToDouble(Float::doubleValue).toArray();
 
             int melhorCluster = -1;
@@ -93,17 +91,16 @@ public class ClusterService {
                     "profecia", List.of("profecia", "ellen", "apocalipse", "visão"), 
                     "comunidade", List.of("igreja", "comunidade", "templo"));
 
-            Set<String> palavrasPrompt = Arrays.stream(prompt.toLowerCase().split("\\s+"))
-                    .collect(Collectors.toSet());
+            Set<String> palavrasPrompt = Arrays.stream(prompt.toLowerCase().split("\\s+")).collect(Collectors.toSet());
 
             Set<String> temasDetectados = mapaTopicos.entrySet().stream()
                     .filter(e -> e.getValue().stream().anyMatch(palavrasPrompt::contains))
                     .map(Map.Entry::getKey)
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toSet()); 
 
             for (String tema : temasDetectados) {
                 List<String> extras = clusterMap.values().stream()
-                        .flatMap(List::stream)
+                        .flatMap(List::stream) 
                         .filter(c -> mapaTopicos.get(tema).stream()
                                 .anyMatch(sinonimo -> c.text().toLowerCase().contains(sinonimo)))
                         .map(ChunkData::text)
@@ -118,24 +115,22 @@ public class ClusterService {
             }
 
             return chunksRelevantes;
-        });
+        }).switchIfEmpty(Mono.just(Collections.emptyList())); 
     }
 
-    public record ChunkData(String text, List<Float> embedding) {
-    }
+    public record ChunkData(String text, List<Float> embedding, Long companyId) { 
+    } 
 
     public void recriarClustersComTexto(String texto) {
         try {
             System.out.println("⚙️ Gerando palavras-chave dinamicamente...");
-
-            // 🔍 Gera palavras-chave com base em frequência
             List<String> palavrasChaveDinamicas = extrairPalavrasChave(texto, 10);
-            System.out.println("🔑 Palavras-chave detectadas: " + palavrasChaveDinamicas);
+            System.out.println("🔑 Palavras-chave detectadas: " + palavrasChaveDinamicas); 
 
-            List<String> chunks = fileProcessingService.splitSmartChunks(texto, palavrasChaveDinamicas);
+            List<String> chunks = fileProcessingService.splitSmartChunks(texto, palavrasChaveDinamicas); 
 
-            List<ChunkData> embeddings = chunks.stream()
-                    .map(chunk -> new ChunkData(chunk, embeddingService.embed(chunk).block()))
+            List<ChunkData> embeddings = chunks.stream() 
+                    .map(chunk -> new ChunkData(chunk, embeddingService.embed(chunk, 1L).block(), 1L))
                     .filter(c -> c.embedding() != null && !c.embedding().isEmpty())
                     .toList();
 

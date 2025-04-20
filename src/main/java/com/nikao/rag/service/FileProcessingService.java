@@ -1,36 +1,33 @@
 
 package com.nikao.rag.service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.jsoup.Jsoup;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
-import org.jsoup.nodes.Element;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.regex.Pattern;
-import java.net.URL;
-
-// Add this method to the FileProcessingService class
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 public class FileProcessingService {
@@ -55,12 +52,6 @@ public class FileProcessingService {
         } else if (fileName.endsWith(".docx")) {
             XWPFDocument doc = new XWPFDocument(stream);
             return doc.getParagraphs().stream().map(XWPFParagraph::getText).collect(Collectors.joining("\n"));
-            // } else if (fileName.endsWith(".xml")) {
-            // try {
-            // return extractFromXml(stream);
-            // } catch (Exception e) {
-            // throw new IOException("Erro ao processar XML", e);
-            // }
         } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
             return extractFromExcel(stream);
         } else {
@@ -86,8 +77,8 @@ public class FileProcessingService {
 
     private String extractFromDocx(InputStream inputStream) throws IOException {
         try (XWPFDocument doc = new XWPFDocument(inputStream);
-                XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
-            return extractor.getText();
+             XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
+            return extractor.getText().replaceAll("\\s{2,}", " ").trim();
         }
     }
 
@@ -217,6 +208,6 @@ public class FileProcessingService {
         return chunks;
     }
 
-    
+
 
 }

@@ -2,6 +2,8 @@ package com.nikao.rag.service;
 
 import java.util.List;
 
+
+import com.nikao.rag.repository.CompanyEmbeddingRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,13 +14,34 @@ public class RagService {
 
     private final FileProcessingService fileProcessingService;
     private final ClusterService clusterService;
+    private final CompanyEmbeddingRepository companyEmbeddingRepository;
 
-    public RagService(FileProcessingService fps, ClusterService cs) {
+    public RagService(FileProcessingService fps, ClusterService cs, CompanyEmbeddingRepository companyEmbeddingRepository) {
         this.fileProcessingService = fps;
         this.clusterService = cs;
+        this.companyEmbeddingRepository = companyEmbeddingRepository;
+    }
+    
+    public Mono<Void> processarFontes(List<String> urls, List<MultipartFile> arquivos, String textoManual) {
+        return Mono.fromCallable(() -> {
+            StringBuilder fullText = new StringBuilder();
+
+            if (urls != null) {
+                for (String url : urls) {
+                    try {
+                        System.out.println("🌐 Processando URL: " + url);
+                        fullText.append(fileProcessingService.extractTextFromUrl(url)).append("\n\n");
+                    } catch (Exception e) {
+                        System.err.println("Erro ao extrair de URL: " + e.getMessage());
+                    }
+                }
+            }
+
+        }).then();
     }
 
-    public Mono<Void> processarFontes(List<String> urls, List<MultipartFile> arquivos, String textoManual) {
+    public Mono<Void> processCompanyFontes(Long companyId, List<String> urls, List<MultipartFile> arquivos,
+            String textoManual) {
         return Mono.fromCallable(() -> {
             StringBuilder fullText = new StringBuilder();
 
@@ -43,18 +66,11 @@ public class RagService {
                     }
                 }
             }
-
             if (textoManual != null && !textoManual.isBlank()) {
                 System.out.println("📝 Processando texto manual");
                 fullText.append(textoManual).append("\n\n");
             }
-
-            String textoUnificado = fullText.toString().strip();
-
-            if (!textoUnificado.isBlank()) {
-                clusterService.recriarClustersComTexto(textoUnificado);
-            }
-
+            clusterService.recriarClustersComTexto(companyId, fullText.toString().strip());
             return true;
         }).then();
     }
